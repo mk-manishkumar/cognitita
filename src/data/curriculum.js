@@ -21,6 +21,7 @@ export const curriculum = [
         topics: [
           { id: "mongodb", name: "MongoDB", group: "Web Development", path: "/computer-science/mongodb", description: "Flexible data models and document databases.", color: "blue" },
           { id: "backend-from-first-principles", name: "Backend from First Principles", group: "Web Development", path: "/computer-science/backend-from-first-principles", description: "Understand what happens behind every request.", color: "peach" },
+          { id: "nodejs-expressjs", name: "NodeJS and ExpressJS", group: "Web Development", path: "/computer-science/nodejs-expressjs", description: "Build backend applications with Node.js and Express.js.", color: "sage" },
         ],
       },
     ],

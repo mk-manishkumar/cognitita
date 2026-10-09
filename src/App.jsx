@@ -1,125 +1,61 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { Check } from "lucide-react";
-import { ensureChapterOne, getNotes, KEY, day } from "./lib/notes.js";
-import { findTopic, topics } from "./data/curriculum.js";
+import { getNotes } from "./lib/notes.js";
+import { findTopic } from "./data/curriculum.js";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { AppHeader } from "./components/AppHeader.jsx";
-import { SubjectHome, ComputerScience } from "./components/Curriculum.jsx";
 import { TopicPage } from "./components/TopicPage.jsx";
 import { NotePage } from "./components/NotePage.jsx";
 import { Library } from "./components/Library.jsx";
 import { Review } from "./components/Review.jsx";
-import { Settings } from "./components/Settings.jsx";
-import { Editor } from "./components/Editor.jsx";
+import { SubjectHome } from "./components/childcomponent/SubjectHome.jsx";
+import { ComputerScience } from "./components/childcomponent/ComputerScience.jsx";
 
 export default function App() {
-  const [notes, setNotes] = useState(getNotes);
+  const notes = useMemo(getNotes, []);
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState(null);
-  const [newSubject, setNewSubject] = useState("");
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [toast, setToast] = useState("");
-  const [menu, setMenu] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const due = useMemo(() => notes.filter((note) => new Date(note.dueAt).getTime() <= Date.now()), [notes]);
   const page = location.pathname.split("/")[1] || "home";
 
-  useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(notes));
-  }, [notes]);
-  useEffect(() => {
-    const normalized = ensureChapterOne(notes);
-    if (normalized.length !== notes.length || normalized.some((note, index) => note.id !== notes[index]?.id)) setNotes(normalized);
-  }, [notes]);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 2400);
-    return () => clearTimeout(timer);
-  }, [toast]);
-  const newNote = (subject = topics[0].name) => {
-    setEditing(null);
-    setNewSubject(subject);
-    setEditorOpen(true);
+  // The openNote function is used to navigate to a specific note page when a note is selected from the library or review queue. It resets the search query and navigates to the note's detail page using its unique ID.
+  const openNote = (note) => {
+    setQuery("");
+    void navigate(`/note/${note.id}`);
   };
-  const editNote = (note) => {
-    setEditing(note);
-    setEditorOpen(true);
-  };
-  const openNote = (note) => navigate(`/note/${note.id}`);
-  const saveNote = (draft) => {
-    if (editing) {
-      setNotes((current) => current.map((note) => (note.id === editing.id ? { ...note, ...draft, updatedAt: new Date().toISOString() } : note)));
-      setToast("Note saved");
-    } else {
-      const now = new Date().toISOString();
-      setNotes((current) => [...current, { id: crypto.randomUUID(), ...draft, subject: draft.subject || newSubject || "Unsorted", createdAt: now, updatedAt: now, dueAt: now, interval: 1, reps: 0 }]);
-      setToast("Note added to your library");
-    }
-    setEditorOpen(false);
-    setEditing(null);
-  };
-  const removeNote = (id) => {
-    setNotes((current) => current.filter((note) => note.id !== id));
-    setMenu(null);
-    setToast("Note moved out of your library");
-  };
-  const rateNote = (note, rating) => {
-    const interval = rating === "again" ? 1 : rating === "got" ? Math.max(2, note.interval * 2) : Math.max(4, note.interval * 3);
-    setNotes((current) => current.map((item) => (item.id === note.id ? { ...item, interval, reps: item.reps + 1, dueAt: new Date(Date.now() + interval * day).toISOString(), updatedAt: new Date().toISOString() } : item)));
-    setToast(rating === "again" ? "We’ll bring this back tomorrow" : `Next review in ${interval} days`);
-  };
+
+  // The filtered variable holds the notes that match the current search query. It filters the notes array by checking if the note's title, body, or subject includes the search term (case-insensitive). The topic variable is determined based on the current path, specifically for the "computer-science" page, by extracting the topic ID from the URL and finding the corresponding topic in the curriculum. The pageName variable is set based on the current page or topic, with special handling for search results and specific pages like "computer-science".
   const filtered = notes.filter((note) => `${note.title} ${note.body} ${note.subject}`.toLowerCase().includes(query.toLowerCase()));
+
+  // The topic variable is determined based on the current path, specifically for the "computer-science" page, by extracting the topic ID from the URL and finding the corresponding topic in the curriculum. The pageName variable is set based on the current page or topic, with special handling for search results and specific pages like "computer-science".
   const topic = page === "computer-science" ? findTopic(location.pathname.split("/")[2]) : null;
-  const pageName = location.pathname === "/" ? "Your subjects" : location.pathname === "/computer-science" ? "Computer Science" : topic?.name || ({ notes: "All notes", review: "Review queue", settings: "Settings", note: "Note" }[page] || "Your subjects");
+
+  // The pageName variable is set based on the current page or topic, with special handling for search results and specific pages like "computer-science". It uses a mapping of page labels to determine the appropriate name to display in the header. If a search query is present, it overrides the page name to indicate that search results are being shown.
+  const pageLabels = { notes: "All notes", review: "Review queue", note: "Note" };
+  let pageName = pageLabels[page] || "Your subjects";
+  if (location.pathname === "/computer-science") pageName = "Computer Science";
+  else if (topic) pageName = topic.name;
+  if (query.trim()) pageName = "Search results";
 
   return (
     <div className="min-h-screen bg-[#f7f7f4] font-sans text-[#292b27]">
-      <Sidebar notes={notes} due={due} onNew={newNote}/>
-      <main className="ml-[68px] min-h-screen sm:ml-[220px] lg:ml-[244px]">
+      <Sidebar notes={notes}/>
+      <main className="ml-17 min-h-screen sm:ml-55 lg:ml-61">
         <AppHeader page={pageName} query={query} onQueryChange={setQuery}/>
-        <Routes>
-          <Route path="/" element={<SubjectHome notes={notes}/>} />
-          <Route path="/computer-science" element={<ComputerScience notes={notes}/>} />
-          <Route path="/computer-science/:topic" element={<TopicPage notes={notes} query={query} setQuery={setQuery} onNew={newNote} onOpen={openNote} onRemove={removeNote} menu={menu} setMenu={setMenu}/>} />
-          <Route path="/note/:noteId" element={<NotePage notes={notes} onEdit={editNote}/>} />
-          <Route path="/notes" element={<Library notes={filtered} total={notes.length} query={query} setQuery={setQuery} onNew={newNote} onOpen={openNote} onRemove={removeNote} menu={menu} setMenu={setMenu} />} />
-          <Route path="/review" element={<Review notes={due} onRate={rateNote} onEdit={editNote} onNew={newNote} />} />
-          <Route
-            path="/settings"
-            element={
-              <Settings
-                notes={notes}
-                onImport={(items) => {
-                  setNotes(items);
-                  setToast("Your notes are ready");
-                }}
-              />
-            }
-          />
-          <Route path="*" element={<SubjectHome notes={notes}/>} />
-        </Routes>
+        {query.trim() ? (
+          <Library notes={filtered} total={filtered.length} query={query} setQuery={setQuery} onOpen={openNote}/>
+        ) : (
+          <Routes>
+            <Route path="/" element={<SubjectHome notes={notes}/>} />
+            <Route path="/computer-science" element={<ComputerScience notes={notes}/>} />
+            <Route path="/computer-science/:topic" element={<TopicPage notes={notes} query={query} setQuery={setQuery} onOpen={openNote}/>} />
+            <Route path="/note/:noteId" element={<NotePage notes={notes}/>} />
+            <Route path="/notes" element={<Library notes={filtered} total={notes.length} query={query} setQuery={setQuery} onOpen={openNote}/>} />
+            <Route path="/review" element={<Review notes={notes} onOpen={openNote}/>} />
+            <Route path="*" element={<SubjectHome notes={notes}/>} />
+          </Routes>
+        )}
       </main>
-      {editorOpen && (
-        <Editor
-          note={editing}
-          defaultSubject={newSubject}
-          onClose={() => {
-            setEditorOpen(false);
-            setEditing(null);
-          }}
-          onSave={saveNote}
-        />
-      )}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-[#313b30] px-3.5 py-2.5 text-[10px] text-white shadow-xl sm:left-[calc(50%+122px)]">
-          <span className="grid size-[18px] place-items-center rounded-full bg-[#71876c]">
-            <Check size={14} />
-          </span>
-          {toast}
-        </div>
-      )}
     </div>
   );
 }
